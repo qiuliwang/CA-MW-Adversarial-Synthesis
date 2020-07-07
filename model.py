@@ -4,27 +4,17 @@ import cv2
 from ops import *
 import tensorflow as tf
 import numpy as np
-import os
 
-class MCGAN(object):
+class CMGAN(object):
 
     # build model
-    def __init__(self, data_ob, output_size, learn_rate, batch_size, z_dim, y_dim, log_dir
+    def __init__(self, data_ob, train_dir, eval_dir, test_dir, output_size, learn_rate, batch_size, z_dim, y_dim, log_dir
          , model_path, load = False, gf_dim=64, df_dim = 64, output_c_dim=1, L1_lambda=100):
 
         self.data_ob = data_ob
-        self.train_sample_dir = 'train_samples'
-        self.valid_sample_dir = 'valid_samples'
-        self.test_sample_dir = 'test_samples'
-
-        if not os.path.exists(self.train_sample_dir):
-            os.makedirs(self.train_sample_dir)
-        if not os.path.exists(self.valid_sample_dir):
-            os.makedirs(self.valid_sample_dir)
-        if not os.path.exists(self.test_sample_dir):
-            os.makedirs(self.test_sample_dir)
-
-
+        self.train_dir = train_dir
+        self.eval_dir = eval_dir
+        self.test_dir = test_dir
         self.output_size = output_size
         self.learn_rate = learn_rate
         self.batch_size = batch_size
@@ -114,9 +104,7 @@ class MCGAN(object):
 
         #the loss of generator network
         # TODO tf.reduce_sum()
-        # self.g_lung_loss = tf.losses.mean_squared_error(self.lungwindow , self.fake_lungwindow)
         self.g_lung_loss = self.L1_lambda * tf.reduce_mean(tf.square(self.lungwindow - self.fake_lungwindow))
-        # self.g_mediastinum_loss = tf.losses.mean_squared_error(self.mediastinumwindow , self.fake_mediastinumwindow)
         
         self.g_mediastinum_loss = self.L1_lambda * tf.reduce_mean(tf.square(self.mediastinumwindow - self.fake_mediastinumwindow))
         
@@ -151,7 +139,10 @@ class MCGAN(object):
         config.gpu_options.allow_growth = True
 
         with tf.Session(config=config) as sess:
+
             sess.run(init)
+            # self.g_sum = tf.summary.merge()
+
             if self.load:
                 print('loading:')
                 self.saver = tf.train.import_meta_graph('./model/model.ckpt-20201.meta')  # default to save all variable
@@ -163,7 +154,6 @@ class MCGAN(object):
             step = 0
             while step <= self.training_step:
                 realbatch_array, real_lungs, real_mediastinums, realmasks, real_labels = self.data_ob.getNext_batch(step,batch_size=self.batch_size)
-                # ########## use or not use
                 batch_z = np.random.uniform(-1, 1, size=[self.batch_size, self.z_dim])
                 sess.run([opti_D],feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
 
@@ -172,56 +162,51 @@ class MCGAN(object):
                     
 
                 if np.mod(step, 50) == 1 and step != 0:
-                    print('draw')
+                    print('Training...')
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
                     save_images(sample_images, [8, 8],
-                                './{}/{:04d}_sample.png'.format(self.train_sample_dir, step))
+                                './{}/{:04d}_sample.png'.format(self.train_dir, step))
                     save_images(lungwindow, [8, 8],
-                                './{}/{:04d}_lung.png'.format(self.train_sample_dir, step))
+                                './{}/{:04d}_lung.png'.format(self.train_dir, step))
                     save_images(mediastinumwindow, [8, 8],
-                                './{}/{:04d}_mediastinum.png'.format(self.train_sample_dir, step))
+                                './{}/{:04d}_mediastinum.png'.format(self.train_dir, step))
 
                     save_images(realmasks, [8, 8],
-                                './{}/{:04d}_mask.png'.format(self.train_sample_dir, step)) 
+                                './{}/{:04d}_mask.png'.format(self.train_dir, step)) 
                                 
-                    print('save train images')
+                    print('save eval image')
 
                     real_labels = sample_label()
                     realmasks = sample_masks()
 
-                    sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow]
-                                                        , feed_dict={
-                                                                     self.masks: realmasks
-                                                                    ,self.y: real_labels})
+                    sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.masks: realmasks, self.y: real_labels})
 
                     save_images(sample_images, [8, 8],
-                                './{}/{:04d}_sample.png'.format(self.valid_sample_dir, step))
+                                './{}/{:04d}_sample.png'.format(self.eval_dir, step))
                     save_images(lungwindow, [8, 8],
-                                './{}/{:04d}_lung.png'.format(self.valid_sample_dir, step))
+                                './{}/{:04d}_lung.png'.format(self.eval_dir, step))
                     save_images(mediastinumwindow, [8, 8],
-                                './{}/{:04d}_mediastinum.png'.format(self.valid_sample_dir, step))  
+                                './{}/{:04d}_mediastinum.png'.format(self.eval_dir, step))  
                     save_images(realmasks, [8, 8],
-                                './{}/{:04d}_mask.png'.format(self.valid_sample_dir, step)) 
-                    print('save valid image')
+                                './{}/{:04d}_mask.png'.format(self.eval_dir, step)) 
+                    
+                    #================
+                    print('save test image')
 
                     real_labels = sample_label()
                     realmasks = sample_masks_test()
 
-                    sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow]
-                                                        , feed_dict={
-                                                                     self.masks: realmasks
-                                                                    ,self.y: real_labels})
+                    sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.masks: realmasks, self.y: real_labels})
 
                     save_images(sample_images, [8, 8],
-                                './{}/{:04d}_sample.png'.format(self.test_sample_dir, step))
+                                './{}/{:04d}_sample.png'.format(self.test_dir, step))
                     save_images(lungwindow, [8, 8],
-                                './{}/{:04d}_lung.png'.format(self.test_sample_dir, step))
+                                './{}/{:04d}_lung.png'.format(self.test_dir, step))
                     save_images(mediastinumwindow, [8, 8],
-                                './{}/{:04d}_mediastinum.png'.format(self.test_sample_dir, step))                   
+                                './{}/{:04d}_mediastinum.png'.format(self.test_dir, step))                   
                     save_images(realmasks, [8, 8],
-                                './{}/{:04d}_mask.png'.format(self.test_sample_dir, step))  
+                                './{}/{:04d}_mask.png'.format(self.test_dir, step))  
                     self.saver.save(sess, self.model_path,global_step=step)
-                    print('save test image')
 
                 step = step + 1
 
@@ -240,9 +225,9 @@ class MCGAN(object):
 
             output = sess.run(self.fake_images, feed_dict={self.z: sample_z, self.y: sample_label()})
 
-            save_images(output, [8, 8], './{}/test{:02d}_{:04d}.png'.format(self.test_sample_dir, 0, 0))
+            save_images(output, [8, 8], './{}/test{:02d}_{:04d}.png'.format(self.train_dir, 0, 0))
 
-            image = cv2.imread('./{}/test{:02d}_{:04d}.png'.format(self.test_sample_dir, 0, 0), 0)
+            image = cv2.imread('./{}/test{:02d}_{:04d}.png'.format(self.train_dir, 0, 0), 0)
 
             cv2.imshow("test", image)
 
@@ -255,54 +240,36 @@ class MCGAN(object):
             print('generator U-Net:')
             print('shape of y: ', y.get_shape().as_list()) # 64 * 13
             print('shape of image: ', image.get_shape().as_list()) # 64 * 128 * 128 * 1
-
-            print('-----------chini----------')
             y = tf.reshape(y, shape=[self.batch_size, 1, 1, self.y_dim])
-            # y = tf.layers.dense(y,128*128,activation=tf.nn.relu)
-            # y = tf.reshape(y, shape=[self.batch_size, 128, 128, 1])
 
             s = self.output_size
             s2, s4, s8, s16, s32, s64, s128 = int(s/2), int(s/4), int(s/8), int(s/16), int(s/32), int(s/64), int(s/128)
-
-            # image is (256 x 256 x input_c_dim)
-            image = conv_cond_concat(image, y)
-            # image = tf.concat([image,y],3)
             
             print('shape of image: ', image.get_shape().as_list())
            
             e1 = conv2d_UNet(image, self.gf_dim, name='g_e1_conv')
-            # e1 is (128 x 128 x self.gf_dim)
-            # e1 = conv_cond_concat(e1, y)
             e1 = conv_cond_concat(e1, y)
 
             e2 = self.g_bn_e2(conv2d_UNet(lrelu(e1), self.gf_dim*2, name='g_e2_conv'))
             e2 = conv_cond_concat(e2, y)
 
-            # e2 is (64 x 64 x self.gf_dim*2)
             e3 = self.g_bn_e3(conv2d_UNet(lrelu(e2), self.gf_dim*4, name='g_e3_conv'))
             e3 = conv_cond_concat(e3, y)
 
-            # e3 is (32 x 32 x self.gf_dim*4)
             e4 = self.g_bn_e4(conv2d_UNet(lrelu(e3), self.gf_dim*8, name='g_e4_conv'))
             e4 = conv_cond_concat(e4, y)
 
-            # e4 is (16 x 16 x self.gf_dim*8)
             e5 = self.g_bn_e5(conv2d_UNet(lrelu(e4), self.gf_dim*8, name='g_e5_conv'))
             e5 = conv_cond_concat(e5, y)
      
-            # e5 is (8 x 8 x self.gf_dim*8)
             e6 = self.g_bn_e6(conv2d_UNet(lrelu(e5), self.gf_dim*8, name='g_e6_conv'))
             e6 = conv_cond_concat(e6, y)
 
-            # e6 is (4 x 4 x self.gf_dim*8)
             e7 = self.g_bn_e7(conv2d_UNet(lrelu(e6), self.gf_dim*8, name='g_e7_conv'))
             e7 = conv_cond_concat(e7, y)
 
-            # e7 is (2 x 2 x self.gf_dim*8)
             e8 = self.g_bn_e8(conv2d_UNet(lrelu(e7), self.gf_dim*8, name='g_e8_conv'))
             e8 = conv_cond_concat(e8, y)
-
-            # e8 is (1 x 1 x self.gf_dim*8)
 
             self.d1, self.d1_w, self.d1_b = deconv2d(tf.nn.relu(e8),
                 [self.batch_size, s128, s128, self.gf_dim*8], name='g_d1', with_w=True)
@@ -310,15 +277,11 @@ class MCGAN(object):
             d1 = tf.concat([d1, e7], 3)
             d1 = conv_cond_concat(d1, y)
            
-            # d1 is (2 x 2 x self.gf_dim*8*2)
-
             self.d2, self.d2_w, self.d2_b = deconv2d(tf.nn.relu(d1),
                 [self.batch_size, s64, s64, self.gf_dim*8], name='g_d2', with_w=True)
             d2 = tf.nn.dropout(self.g_bn_d2(self.d2), 0.5)
             d2 = tf.concat([d2, e6], 3)
             d2 = conv_cond_concat(d2, y)
-
-            # d2 is (4 x 4 x self.gf_dim*8*2)
 
             self.d3, self.d3_w, self.d3_b = deconv2d(tf.nn.relu(d2),
                 [self.batch_size, s32, s32, self.gf_dim*8], name='g_d3', with_w=True)
@@ -326,14 +289,11 @@ class MCGAN(object):
             d3 = tf.concat([d3, e5], 3)
             d3 = conv_cond_concat(d3, y)
 
-            # d3 is (8 x 8 x self.gf_dim*8*2)
-
             self.d4, self.d4_w, self.d4_b = deconv2d(tf.nn.relu(d3),
                 [self.batch_size, s16, s16, self.gf_dim*8], name='g_d4', with_w=True)
             d4 = self.g_bn_d4(self.d4)
             d4 = tf.concat([d4, e4], 3)
             d4 = conv_cond_concat(d4, y)
-            # d4 is (16 x 16 x self.gf_dim*8*2)
 
             self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
                 [self.batch_size, s8, s8, self.gf_dim*4], name='g_d5', with_w=True)
@@ -341,15 +301,11 @@ class MCGAN(object):
             d5 = tf.concat([d5, e3], 3)
             d5 = conv_cond_concat(d5, y)
 
-            # d5 is (32 x 32 x self.gf_dim*4*2)
-
             self.d6, self.d6_w, self.d6_b = deconv2d(tf.nn.relu(d5),
                 [self.batch_size, s4, s4, self.gf_dim*2], name='g_d6', with_w=True)
             d6 = self.g_bn_d6(self.d6)
             d6 = tf.concat([d6, e2], 3)
             d6 = conv_cond_concat(d6, y)
-
-            # d6 is (64 x 64 x self.gf_dim*2*2)
 
             self.d7, self.d7_w, self.d7_b = deconv2d(tf.nn.relu(d6),
                 [self.batch_size, s2, s2, self.gf_dim], name='g_d7', with_w=True)
@@ -357,11 +313,8 @@ class MCGAN(object):
             d7 = tf.concat([d7, e1], 3)
             d7 = conv_cond_concat(d7, y)
 
-            # d7 is (128 x 128 x self.gf_dim*1*2)
-
             self.d8, self.d8_w, self.d8_b = deconv2d(tf.nn.relu(d7),
                 [self.batch_size, s, s, self.output_c_dim], name='g_d8', with_w=True)
-            # d8 is (256 x 256 x output_c_dim)
             print('shape of d8: ', self.d8.get_shape().as_list())
             return tf.nn.tanh(self.d8)
 

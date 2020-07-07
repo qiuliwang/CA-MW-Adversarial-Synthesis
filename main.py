@@ -1,13 +1,14 @@
-from model import MCGAN
+from model import CMGAN
 import tensorflow as tf
 from utils import LIDC
 import os
 import argparse
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 flags = tf.app.flags
 
+flags.DEFINE_string("sample_dir" , "samples_for_test" , "the dir of sample images")
 flags.DEFINE_integer("output_size", 128 , "the size of generate image")
 flags.DEFINE_float("learn_rate", 0.0002, "the learning rate for gan")
 flags.DEFINE_integer("batch_size", 64, "the batch number")
@@ -15,8 +16,12 @@ flags.DEFINE_integer("z_dim", 100, "the dimension of noise z")
 flags.DEFINE_integer("y_dim", 15, "the dimension of condition y")
 flags.DEFINE_string("log_dir" , "/tmp/tensorflow_mnist" , "the path of tensorflow's log")
 flags.DEFINE_string("model_path" , "model/model.ckpt" , "the path of model")
-flags.DEFINE_string("visua_path" , "visualization" , "the path of visuzation images")
-flags.DEFINE_integer("op" , 0, "0: train ; 1:test ; 2:visualize")
+flags.DEFINE_integer("op" , 0, "0: train ; 1:test")
+
+flags.DEFINE_string("train_dir" , "train_images" , "the path of training images")
+flags.DEFINE_string("eval_dir" , "eval_images" , "the path of evaluating images")
+flags.DEFINE_string("test_dir" , "test_images" , "the path of testing images")
+
 
 FLAGS = flags.FLAGS
 
@@ -31,25 +36,24 @@ parser.add_argument('--ngf', dest='ngf', type=int, default=64, help='# of gen fi
 parser.add_argument('--ndf', dest='ndf', type=int, default=64, help='# of discri filters in first conv layer')
 parser.add_argument('--input_nc', dest='input_nc', type=int, default=3, help='# of input image channels')
 parser.add_argument('--output_nc', dest='output_nc', type=int, default=3, help='# of output image channels')
-parser.add_argument('--niter', dest='niter', type=int, default=200, help='# of iter at starting learning rate')
 parser.add_argument('--lr', dest='lr', type=float, default=0.0002, help='initial learning rate for adam')
 parser.add_argument('--beta1', dest='beta1', type=float, default=0.5, help='momentum term of adam')
-parser.add_argument('--flip', dest='flip', type=bool, default=True, help='if flip the images for data argumentation')
-parser.add_argument('--which_direction', dest='which_direction', default='AtoB', help='AtoB or BtoA')
 parser.add_argument('--phase', dest='phase', default='train', help='train, test')
 parser.add_argument('--save_epoch_freq', dest='save_epoch_freq', type=int, default=500, help='save a model every save_epoch_freq epochs (does not overwrite previously saved models)')
 parser.add_argument('--save_latest_freq', dest='save_latest_freq', type=int, default=5000, help='save the latest model every latest_freq sgd iterations (overwrites the previous latest model)')
 parser.add_argument('--print_freq', dest='print_freq', type=int, default=50, help='print the debug information every print_freq iterations')
-parser.add_argument('--continue_train', dest='continue_train', type=bool, default=False, help='if continue training, load the latest model: 1: true, 0: false')
-parser.add_argument('--serial_batches', dest='serial_batches', type=bool, default=False, help='f 1, takes images in order to make batches, otherwise takes them randomly')
-parser.add_argument('--serial_batch_iter', dest='serial_batch_iter', type=bool, default=True, help='iter into serial image list')
 parser.add_argument('--checkpoint_dir', dest='checkpoint_dir', default='./checkpoint', help='models are saved here')
-parser.add_argument('--test_dir', dest='test_dir', default='./test', help='test sample are saved here')
 parser.add_argument('--L1_lambda', dest='L1_lambda', type=float, default=100.0, help='weight on L1 term in objective')
 
 args = parser.parse_args()
 
-#
+if not os.path.exists(FLAGS.train_dir):
+    os.makedirs(FLAGS.train_dir)
+if not os.path.exists(FLAGS.eval_dir):
+    os.makedirs(FLAGS.eval_dir)
+if not os.path.exists(FLAGS.test_dir):
+    os.makedirs(FLAGS.test_dir)
+
 if not os.path.exists(FLAGS.log_dir):
     os.makedirs(FLAGS.log_dir)
 if not os.path.exists(FLAGS.model_path):
@@ -59,14 +63,10 @@ def main(_):
 
     mn_object = LIDC()
 
-    cg = MCGAN(data_ob = mn_object, output_size=FLAGS.output_size, learn_rate=FLAGS.learn_rate
-         , batch_size=FLAGS.batch_size, z_dim=FLAGS.z_dim, y_dim=FLAGS.y_dim, log_dir=FLAGS.log_dir
-         , model_path=FLAGS.model_path, load = False)
+    cg = CMGAN(data_ob = mn_object, train_dir = FLAGS.train_dir, eval_dir = FLAGS.eval_dir, test_dir = FLAGS.test_dir, output_size=FLAGS.output_size, learn_rate=FLAGS.learn_rate, batch_size=FLAGS.batch_size, z_dim=FLAGS.z_dim, y_dim=FLAGS.y_dim, log_dir=FLAGS.log_dir, model_path=FLAGS.model_path, load = False)
 
     cg.build_model()
     
-    cg.train(args)
-
     if FLAGS.op == 0:
 
         cg.train(args)
