@@ -1,3 +1,7 @@
+'''
+https://github.com/zhangqianhui/Conditional-GAN
+'''
+
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm, variance_scaling_initializer
 

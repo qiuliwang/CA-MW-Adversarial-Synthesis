@@ -1,3 +1,12 @@
+'''
+https://github.com/zhangqianhui/Conditional-GAN
+
+Modified by Wei Chen(wchen@cqu.edu.cn), Qiuli Wang(wangqiuli@cqu.edu.cn)
+7/12/2020
+
+wchen@cqu.edu.cn
+'''
+
 from utils import save_images, vis_square,sample_label,sample_masks, sample_masks_test
 from tensorflow.contrib.layers.python.layers import xavier_initializer
 import cv2
@@ -6,7 +15,6 @@ import tensorflow as tf
 import numpy as np
 
 class CMGAN(object):
-
     # build model
     def __init__(self, data_ob, train_dir, eval_dir, test_dir, output_size, learn_rate, batch_size, z_dim, y_dim, log_dir
          , model_path, load = False, gf_dim=64, df_dim = 64, output_c_dim=1, L1_lambda=100):
