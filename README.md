@@ -1,6 +1,6 @@
 # Code and resources for the paper 'Class-Aware Multi-Window Adversarial Lung Nodule Synthesis Conditioned on Semantic Features'
 
-## More resources are coming soon
+## Under construct
 
 This is the first time we release our experimental source code. The repository is still under construct. Feel free to contact us if you have any suggestion or request.
 
