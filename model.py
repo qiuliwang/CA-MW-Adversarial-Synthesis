@@ -13,7 +13,6 @@ import tensorflow as tf
 import numpy as np
 
 class CMGAN(object):
-    # build model
     def __init__(self, data_ob, train_dir, eval_dir, test_dir, output_size, learn_rate, batch_size, z_dim, y_dim, log_dir
          , model_path, load = False, gf_dim=64, df_dim = 64, output_c_dim=1, L1_lambda=100):
 
@@ -64,12 +63,12 @@ class CMGAN(object):
         self.g_bn_d5 = batch_norm(name='g_bn_d5')
         self.g_bn_d6 = batch_norm(name='g_bn_d6')
         self.g_bn_d7 = batch_norm(name='g_bn_d7')
-
+	
+	# build model
     def build_model(self):
         print('Building the model:')
         self.real_A = self.masks
         print('shape of real_A: ', self.real_A.get_shape().as_list())
-
 
         self.fake_B = self.generator(self.real_A, self.y)
         print('shape of self.y: ', self.y.get_shape().as_list())
@@ -108,22 +107,19 @@ class CMGAN(object):
         self.d_loss_classify_mediastinum_mali = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.pre_mediastinum_mali, labels=self.y_mali))
 
 
-        #the loss of generator network
-        # TODO tf.reduce_sum()
+        # the loss of generator network
         self.g_lung_loss = self.L1_lambda * tf.reduce_mean(tf.square(self.lungwindow - self.fake_lungwindow))
-        
         self.g_mediastinum_loss = self.L1_lambda * tf.reduce_mean(tf.square(self.mediastinumwindow - self.fake_mediastinumwindow))
-        
         self.g_all_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=self.D_all_logits_, labels=tf.ones_like(self.D_all_))) \
                         + self.L1_lambda * tf.reduce_mean(tf.square(self.images - self.fake_B))
 
+        # the loss of decorator network
         self.d_all_loss = self.d_all_loss_fake + self.d_all_loss_real + self.d_loss_classify_lung + self.d_loss_classify_mediastinum + self.d_loss_classify_lung_mali + self.d_loss_classify_mediastinum_mali
         self.d_c_loss = self.d_loss_classify_lung + self.d_loss_classify_mediastinum + self.d_loss_classify_lung_mali + self.d_loss_classify_mediastinum_mali 
         self.d_loss = self.d_all_loss
         self.g_loss = self.g_lung_loss + self.g_mediastinum_loss + self.g_all_loss
 
         t_vars = tf.trainable_variables()
-
         self.d_vars = [var for var in t_vars if 'd_' in var.name]
         self.c_vars = [var for var in t_vars if 'c_' in var.name]
         self.g_vars = [var for var in t_vars if 'g_' in var.name]
@@ -140,21 +136,18 @@ class CMGAN(object):
                           .minimize(self.d_c_loss, var_list=self.c_vars)
 
         init = tf.global_variables_initializer()
-
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
 
         with tf.Session(config=config) as sess:
-
             sess.run(init)
-            # self.g_sum = tf.summary.merge()
-
             if self.load:
+            	# load pretrained model 
                 print('loading:')
                 self.saver = tf.train.import_meta_graph('./model/model.ckpt-20201.meta')  # default to save all variable
                 self.saver.restore(sess, tf.train.latest_checkpoint('./model/'))
+           
             self.writer = tf.summary.FileWriter("./logs", sess.graph)
-
             summary_writer = tf.summary.FileWriter(self.log_dir, graph=sess.graph)
 
             step = 0
@@ -162,13 +155,11 @@ class CMGAN(object):
                 realbatch_array, real_lungs, real_mediastinums, realmasks, real_labels = self.data_ob.getNext_batch(step,batch_size=self.batch_size)
                 batch_z = np.random.uniform(-1, 1, size=[self.batch_size, self.z_dim])
                 sess.run([opti_D],feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
-
                 sess.run([opti_G],feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
                 sess.run([opti_C],feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
-                    
-
+                
                 if np.mod(step, 50) == 1 and step != 0:
-                    print('Training...')
+                    print('Saving...')
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
                     save_images(sample_images, [8, 8],
                                 './{}/{:04d}_sample.png'.format(self.train_dir, step))
@@ -176,17 +167,14 @@ class CMGAN(object):
                                 './{}/{:04d}_lung.png'.format(self.train_dir, step))
                     save_images(mediastinumwindow, [8, 8],
                                 './{}/{:04d}_mediastinum.png'.format(self.train_dir, step))
-
                     save_images(realmasks, [8, 8],
                                 './{}/{:04d}_mask.png'.format(self.train_dir, step)) 
-                                
+                         
                     print('save eval image')
-
+                    
                     real_labels = sample_label()
                     realmasks = sample_masks()
-
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.masks: realmasks, self.y: real_labels})
-
                     save_images(sample_images, [8, 8],
                                 './{}/{:04d}_sample.png'.format(self.eval_dir, step))
                     save_images(lungwindow, [8, 8],
@@ -196,14 +184,10 @@ class CMGAN(object):
                     save_images(realmasks, [8, 8],
                                 './{}/{:04d}_mask.png'.format(self.eval_dir, step)) 
                     
-                    #================
                     print('save test image')
-
                     real_labels = sample_label()
                     realmasks = sample_masks_test()
-
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.masks: realmasks, self.y: real_labels})
-
                     save_images(sample_images, [8, 8],
                                 './{}/{:04d}_sample.png'.format(self.test_dir, step))
                     save_images(lungwindow, [8, 8],
@@ -211,7 +195,8 @@ class CMGAN(object):
                     save_images(mediastinumwindow, [8, 8],
                                 './{}/{:04d}_mediastinum.png'.format(self.test_dir, step))                   
                     save_images(realmasks, [8, 8],
-                                './{}/{:04d}_mask.png'.format(self.test_dir, step))  
+                                './{}/{:04d}_mask.png'.format(self.test_dir, step))
+                    # save model each 50 epochs  
                     self.saver.save(sess, self.model_path,global_step=step)
 
                 step = step + 1
@@ -219,33 +204,29 @@ class CMGAN(object):
             save_path = self.saver.save(sess, self.model_path)
             print ("Model saved in file: %s" % save_path)
 
+
     def test(self):
-
+    	'''
+    	load pretrained model for model testing
+    	'''
         init = tf.initialize_all_variables()
-
         with tf.Session() as sess:
             sess.run(init)
-
             self.saver.restore(sess, self.model_path)
             sample_z = np.random.uniform(1, -1, size=[self.batch_size, self.z_dim])
-
             output = sess.run(self.fake_images, feed_dict={self.z: sample_z, self.y: sample_label()})
-
             save_images(output, [8, 8], './{}/test{:02d}_{:04d}.png'.format(self.train_dir, 0, 0))
-
             image = cv2.imread('./{}/test{:02d}_{:04d}.png'.format(self.train_dir, 0, 0), 0)
-
             cv2.imshow("test", image)
-
             cv2.waitKey(-1)
-
             print("Test finish!")
+
 
     def generator(self, image, y=None):
         with tf.variable_scope("generator") as scope:
             print('generator U-Net:')
-            print('shape of y: ', y.get_shape().as_list()) # 64 * 13
-            print('shape of image: ', image.get_shape().as_list()) # 64 * 128 * 128 * 1
+            print('shape of y: ', y.get_shape().as_list()) 
+            print('shape of image: ', image.get_shape().as_list()) 
             y = tf.reshape(y, shape=[self.batch_size, 1, 1, self.y_dim])
 
             s = self.output_size
@@ -396,21 +377,17 @@ class CMGAN(object):
 
             image = conv_cond_concat(image, y)
             h0 = lrelu(conv2d_UNet(image, self.df_dim, name='d_h0_conv'))
-            h0 = conv_cond_concat(h0, y)
-            # h0 is (128 x 128 x self.df_dim)
+            h0 = conv_cond_concat(h0, y)           
             h1 = lrelu(self.d_bn1(conv2d_UNet(h0, self.df_dim*2, name='d_h1_conv')))
             h1 = conv_cond_concat(h1, y)
-            # h1 is (64 x 64 x self.df_dim*2)
             h2 = lrelu(self.d_bn2(conv2d_UNet(h1, self.df_dim*4, name='d_h2_conv')))
             h2 = conv_cond_concat(h2, y)
-            # h2 is (32x 32 x self.df_dim*4)
             h3 = lrelu(self.d_bn3(conv2d_UNet(h2, self.df_dim*8, d_h=1, d_w=1, name='d_h3_conv')))
             h3 = conv_cond_concat(h3, y)
-            # h3 is (16 x 16 x self.df_dim*8)
             h4 = linear(tf.reshape(h3, [self.batch_size, -1]), 1, 'd_h3_lin')
             print('shape of h4: ', h4.get_shape().as_list())
-
             return tf.nn.sigmoid(h4), h4
+
 
     def classify_lung(self, image, y=None, reuse=False):
         with tf.variable_scope("classify_lung") as scope:
@@ -424,16 +401,15 @@ class CMGAN(object):
             layer = tf.layers.max_pooling2d(layer,pool_size=[2,2],strides=2,name='c_classify_2')
             layer = tf.layers.conv2d(layer,128,[3,3],padding="same",activation=tf.nn.relu,name='c_classify_3')
             layer = tf.layers.max_pooling2d(layer,pool_size=[2,2],strides=2,name='c_classify_4')
-
             layer = tf.layers.conv2d(layer,256,[3,3],padding="same",activation=tf.nn.relu,name='c_classify_5')
             layer = tf.layers.max_pooling2d(layer,pool_size=[2,2],strides=2,name='c_classify_6')
             layer = tf.reshape(layer, [-1, 16 * 16 * 256])
-
             layer = tf.layers.dense(layer,100,activation=tf.nn.relu,name='c_classify_7')
             layer = tf.layers.dropout(layer,0.5,name='c_classify_8')
             layer = tf.layers.dense(layer,5,activation=tf.nn.relu,name='c_classify_9')
             logits = tf.nn.softmax(layer)
             return layer, logits
+
 
     def classify_mediastinum(self, image, y=None, reuse=False):
         with tf.variable_scope("classify_mediastinum") as scope:
@@ -459,7 +435,7 @@ class CMGAN(object):
             logits = tf.nn.softmax(layer)
             return layer, logits
 
-# classify for malignancy level of lung window
+
     def classify_lung_mali(self, image, y=None, reuse=False):
         with tf.variable_scope("classify_lung_mali") as scope:
             print('classify_lung_mali:')
@@ -482,6 +458,7 @@ class CMGAN(object):
             layer = tf.layers.dense(layer,5,activation=tf.nn.relu,name='c_classify_mali_9')
             logits = tf.nn.softmax(layer)
             return layer, logits
+
 
     def classify_mediastinum_mali(self, image, y=None, reuse=False):
         with tf.variable_scope("classify_mediastinum_mali") as scope:
