@@ -1,5 +1,6 @@
 """
 Some codes from https://github.com/Newmu/dcgan_code
+load train and test data.
 """
 from __future__ import division
 import math
@@ -115,13 +116,11 @@ class LIDC(object):
         self.shape = [112 , 112 , 1]
         self.image_size = 112
         self.load_lidc()
-        #self.data, self.data_y = self.load_lidc()
+        # self.data, self.data_y = self.load_lidc()
 
     def load_lidc(self):
         '''
-        mnist data size:
-            (70000, 28, 28, 1)
-            (70000,)
+        LIDC data size: 128, 128, 1
         '''
         data_dir = os.path.join('./huimages/')
         mask_dir = os.path.join('./masks/')
@@ -145,15 +144,14 @@ class LIDC(object):
 
             nodule_image_name = str(scanid) + '_' + str(noduleid) + '_' + str(scan_list_id) + '.npy'
             if nodule_image_name in self.images_list:
-                # lobulation = onenodule[26]
+                # attributes labels 
                 lobulation = onenodule[28]
                 spiculation = onenodule[27]
                 malignancy = onenodule[29]
 
                 if float(lobulation) >= 0 or float(spiculation) >= 0:
                     trainingdata.append(onenodule)
-                    # print(len(onenodule)) # 30 
-                    ## TODO 数据扩充
+                # data augmentation
                 if float(lobulation) >= 3 or float(spiculation) >= 3:
                     import copy
                     copy.deepcopy
@@ -165,70 +163,62 @@ class LIDC(object):
                     down.append('down')
                     trainingdata.append(left)
                     trainingdata.append(right)
-                    trainingdata.append(down)
-                    # print(len(left))  # 31      
+                    trainingdata.append(down)   
 
         
         print('number of training data: ', len(trainingdata)) 
         trainingdata = np.array(trainingdata)
         shuffle(trainingdata)
         self.data = trainingdata
-        '''
-         LIDC-IDRI-1011_4_2.npy
-        '''
+
 
     def getNext_batch(self, iter_num=0, batch_size=64):
 
         ro_num = len(self.data) / batch_size - 1
-
-        # if iter_num % ro_num == 0:
         batch_data = self.data[int(iter_num % ro_num) * batch_size: int(iter_num% ro_num + 1) * batch_size]
-        # batch_data = self.data
         length = len(batch_data)
-        # print(int(iter_num % ro_num) * batch_size)
-        # print(int(iter_num% ro_num + 1) * batch_size)
-
+  
         labels = []
         images = []
         masks = []
         lungs = []
         mediastinums = []
         for onedata in batch_data:
-            # float(onedata[26]
-
             scanid = onedata[1]
             scanid = caseid_to_scanid(int(scanid))
             noduleid = onedata[3]
             scan_list_id = onedata[2]
 
             nodule_image_name = str(scanid) + '_' + str(noduleid) + '_' + str(scan_list_id)
-            # print(nodule_image_name)
-
             nodule_npy = nodule_image_name + '.npy'
-            # if len(onedata)==30:
+            
+            # load hu images 
+            # each image is resized to 128 * 128
             hu = np.load('./huimages/' + nodule_npy)
             image = normalization(hu)
             image = cv2.resize(image, (128, 128))
-
+            
+            # lung window
             hu = np.load('./huimages/' + nodule_npy)
             lung = truncate_hu(hu, 50, -1250)
-            # lung = normalization(lung)
             lung = cv2.resize(lung, (128, 128))
-
+            
+            # mediastinum window
             hu = np.load('./huimages/' + nodule_npy)
             mediastinum = truncate_hu(hu,240,-160)
-            # mediastinum = normalization(mediastinum)
             mediastinum = cv2.resize(mediastinum, (128, 128))
-            # make bone  imfomation
+            
+            # make bone imfomation
             bone = np.load('./huimages/' + nodule_npy)
             bone[bone<=300] = 0 
             bone[bone>300] = 1
              
+            # load masks
             mask = np.load('./masks/' + nodule_npy) + bone
             mask[mask>=1]=1
-            # bone = cv2.resize(bone, (128, 128))
-            # plt.imsave('bone_mask/'+str(nodule_image_name)+'.jpg',bone,cmap=cm.gray) 
             mask = cv2.resize(mask, (128, 128))
+
+            # apply data augmentation
             x, y = 63.5,63.5
             if onedata[-1] =='left':
                 matRoate = cv2.getRotationMatrix2D((x, y), 90, 1.)
@@ -266,48 +256,36 @@ class LIDC(object):
             spiculation = np.array(one_shot_attri(float(onedata[27])))
             malignancy = np.array(one_shot_attri(float(onedata[29])))
             y = np.concatenate((lobulation, spiculation, malignancy), axis = 0)
-            # print(y.shape)
-
             labels.append(y)
-            # print(y)
+        
         images = np.expand_dims(images, axis=3)
         masks = np.expand_dims(masks, axis=3)
         lungs = np.expand_dims(lungs, axis = 3)
         mediastinums = np.expand_dims(mediastinums, axis = 3)
 
         return images, lungs, mediastinums, masks, labels
-        #     perm = np.arange(length)
-        #     np.random.shuffle(perm)
-        #     self.data = np.array(self.data)
-        #     self.data = self.data[perm]
-        #     self.data_y = np.array(self.data_y)
-        #     self.data_y = self.data_y[perm]
-
-        # return self.data[int(iter_num % ro_num) * batch_size: int(iter_num% ro_num + 1) * batch_size] \
-        #     , self.data_y[int(iter_num % ro_num) * batch_size: int(iter_num%ro_num + 1) * batch_size]
-
 
 
 def normalization(matrix):
+	'''
+	matrix : hu values
+	'''
     matrix = matrix.copy()
-    # amin, amax = -2000, 2000
-    # try:
     amin, amax = matrix.min(),matrix.max()
     if amax-amin == 0:
         amin, amax = -2000, 2000
         matrix = (matrix-amin)/(amax-amin) - 0.5
     else:
         matrix = (matrix-amin)/(amax-amin) - 0.5
-# except:
-    
     return matrix
+
 
 def truncate_hu_bone(image_array, max, min):
     image = image_array.copy()
     image[image > max] = max
     image[image < min] = min
-    # image = normalization(image)
     return image
+
 
 def truncate_hu(image_array, max, min):
     image = image_array.copy()
@@ -316,13 +294,6 @@ def truncate_hu(image_array, max, min):
     image = normalization(image)
     return image
 
-# def normalization2(image_array):
-#     max = image_array.max()
-#     min = image_array.min()
-#     image_array = (image_array-min)/(max-min)  # float cannot apply the compute,or array error will occur
-#     avg = image_array.mean()
-#     image_array = image_array-avg
-#     return image_array   # a bug here, a array must be returned,directly appling function did't work
 
 def one_shot_diam(diam):
     if diam < 10:
@@ -387,8 +358,9 @@ def read_image_list(category):
 
 ##from caffe
 def vis_square(visu_path , data , type):
-    """Take an array of shape (n, height, width) or (n, height, width , 3)
-       and visualize each (height, width) thing in a grid of size approx. sqrt(n) by sqrt(n)"""
+   	'''Take an array of shape (n, height, width) or (n, height, width , 3)
+       and visualize each (height, width) thing in a grid of size approx. sqrt(n) by sqrt(n)
+    '''
 
     # normalize data for display
     data = (data - data.min()) / (data.max() - data.min())
@@ -415,13 +387,6 @@ def vis_square(visu_path , data , type):
         plt.savefig('./{}/activation.png'.format(visu_path) , format='png')
 
 
-# def sample_label():
-#     num = 64
-#     label_vector = np.zeros((num , 13), dtype=np.float)
-#     for i in range(0 , num):
-#         label_vector[i , int(i/8)] = 1.0
-#     return label_vector
-
 def caseid_to_scanid(caseid):
     returnstr = ''
     if caseid < 10:
@@ -436,6 +401,9 @@ def caseid_to_scanid(caseid):
 
 
 def sample_label():
+	'''
+	sample test attribute labels
+	'''
     label_vector = []
     for i in range(8):
         # manually set testing labels
@@ -454,8 +422,10 @@ def sample_label():
 def sample_lungwindow():
     return np.zeros((64, 128, 128, 1), np.float)
 
+
 def sample_mediastinumwindow():
     return np.zeros((64, 128, 128, 1), np.float)
+
 
 def sample_masks():
     datapath = './testdata/'
@@ -477,8 +447,10 @@ def sample_masks():
     masks = np.expand_dims(masks, axis = 3)
     return masks
 
+
 def sample_image():
     return np.zeros((64, 128, 128, 1), np.float)
+
 
 def sample_masks_test():
     datapath = './masks/'
