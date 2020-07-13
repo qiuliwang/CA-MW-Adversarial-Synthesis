@@ -149,7 +149,7 @@ def conv_cond_concat(x, y):
     """Concatenate conditioning vector on feature map axis."""
     x_shapes = x.get_shape()
     y_shapes = y.get_shape() 
-
+    # ....
     # ('x_shapes: ', TensorShape([Dimension(64), Dimension(7), Dimension(7), Dimension(128)]))
     # ('y_shape: ', TensorShape([Dimension(64), Dimension(1), Dimension(1), Dimension(10)]))
     # ('concat: ', TensorShape([Dimension(64), Dimension(7), Dimension(7), Dimension(138)]))

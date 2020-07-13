@@ -3,8 +3,6 @@ https://github.com/zhangqianhui/Conditional-GAN
 
 Modified by Wei Chen(wchen@cqu.edu.cn), Qiuli Wang(wangqiuli@cqu.edu.cn)
 7/12/2020
-
-wchen@cqu.edu.cn
 '''
 
 from utils import save_images, vis_square,sample_label,sample_masks, sample_masks_test
