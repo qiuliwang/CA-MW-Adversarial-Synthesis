@@ -15,6 +15,7 @@ Access Code : `d33a`
 ## Requirements
 
 Tensorflow >= 1.4
+The implementation for Tensorflow 2 has not been finished.
 
 ## References
 

@@ -438,7 +438,7 @@ def caseid_to_scanid(caseid):
 def sample_label():
     label_vector = []
     for i in range(8):
-
+        # manually set testing labels
         label_vector.append(np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0], dtype = np.float))
         label_vector.append(np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1], dtype = np.float))
         label_vector.append(np.array([1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0], dtype = np.float))
