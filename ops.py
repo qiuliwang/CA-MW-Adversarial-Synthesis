@@ -7,7 +7,7 @@ Modified by Wei Chen(wchen@cqu.edu.cn)
 import tensorflow as tf
 from tensorflow.contrib.layers.python.layers import batch_norm, variance_scaling_initializer
 
-#the implements of leakyRelu
+# the implements of leakyRelu
 def lrelu(x , alpha = 0.2 , name="LeakyReLU"):
     return tf.maximum(x , alpha*x)
 
@@ -146,17 +146,9 @@ def fully_connect(input_, output_size, scope=None, with_w=False,
       return tf.matmul(input_, matrix) + bias
 
 def conv_cond_concat(x, y):
-    """Concatenate conditioning vector on feature map axis."""
+    '''Concatenate conditioning vector on feature map axis.'''
     x_shapes = x.get_shape()
     y_shapes = y.get_shape() 
-    # ....
-    # ('x_shapes: ', TensorShape([Dimension(64), Dimension(7), Dimension(7), Dimension(128)]))
-    # ('y_shape: ', TensorShape([Dimension(64), Dimension(1), Dimension(1), Dimension(10)]))
-    # ('concat: ', TensorShape([Dimension(64), Dimension(7), Dimension(7), Dimension(138)]))
-    # print('---------------------shape-chini---------------')
-    # print('x_shapes: ', x_shapes)
-    # print('y_shape: ', y_shapes)
-    # print('concat: ', tf.concat([x , y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2] , y_shapes[3]])], 3).get_shape())
     return tf.concat([x , y*tf.ones([x_shapes[0], x_shapes[1], x_shapes[2] , y_shapes[3]])+0.001], 3)
 
 def batch_normal(input , scope="scope" , reuse=False):

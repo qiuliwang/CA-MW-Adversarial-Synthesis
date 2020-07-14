@@ -85,6 +85,7 @@ class CMGAN(object):
         self.d_all_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = self.D_all_logits, labels = tf.ones_like(self.D_all)))
         self.d_all_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = self.D_all_logits_, labels = tf.zeros_like(self.D_all_)))
         
+        # get labels for attributes
         self.y_lobu = tf.slice(self.y, [0,0], [64,5])
         self.y_spicu = tf.slice(self.y, [0,5], [64,5])
         self.y_mali = tf.slice(self.y, [0,10], [64,5])
@@ -105,7 +106,6 @@ class CMGAN(object):
 
         self.pre_mediastinum_mali, self.pre_mediastinum_logits_mali = self.classify_mediastinum_mali(self.fake_mediastinumwindow)
         self.d_loss_classify_mediastinum_mali = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.pre_mediastinum_mali, labels=self.y_mali))
-
 
         # the loss of generator network
         self.g_lung_loss = self.L1_lambda * tf.reduce_mean(tf.square(self.lungwindow - self.fake_lungwindow))
@@ -144,13 +144,13 @@ class CMGAN(object):
             if self.load:
             	# load pretrained model 
                 print('loading:')
-                self.saver = tf.train.import_meta_graph('./model/model.ckpt-20201.meta')  # default to save all variable
+                self.saver = tf.train.import_meta_graph('./model/model.ckpt-20201.meta') # default to save all variable
                 self.saver.restore(sess, tf.train.latest_checkpoint('./model/'))
            
             self.writer = tf.summary.FileWriter("./logs", sess.graph)
             summary_writer = tf.summary.FileWriter(self.log_dir, graph=sess.graph)
 
-            step = 0
+            step = 0 # defalt 50000 epochs
             while step <= self.training_step:
                 realbatch_array, real_lungs, real_mediastinums, realmasks, real_labels = self.data_ob.getNext_batch(step,batch_size=self.batch_size)
                 batch_z = np.random.uniform(-1, 1, size=[self.batch_size, self.z_dim])
@@ -223,6 +223,9 @@ class CMGAN(object):
 
 
     def generator(self, image, y=None):
+    	'''
+    	We use a modified U-Net as the backbone of generator.
+    	'''
         with tf.variable_scope("generator") as scope:
             print('generator U-Net:')
             print('shape of y: ', y.get_shape().as_list()) 
