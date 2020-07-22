@@ -13,6 +13,7 @@ from utils import LIDC
 import os
 import argparse
 
+# setting GPU id
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 flags = tf.app.flags
@@ -85,5 +86,3 @@ def main(_):
 
 if __name__ == '__main__':
     tf.app.run()
-
-# test
