@@ -144,7 +144,19 @@ class LIDC(object):
 
             nodule_image_name = str(scanid) + '_' + str(noduleid) + '_' + str(scan_list_id) + '.npy'
             if nodule_image_name in self.images_list:
-                # attributes labels 
+                '''
+                attributes labels 
+                You have access to 9 attributes provided by LIDC-IDRI, all attribute scores are average scores.
+                <subtlety>21</subtlety>
+                <internalStructure>22</internalStructure>
+                <calcification>23</calcification>
+                <sphericity>24</sphericity>
+                <margin>25</margin>
+                <lobulation>26</lobulation>
+                <spiculation>27</spiculation>
+                <texture>28</texture>
+                <malignancy>29</malignancy>
+                '''
                 lobulation = onenodule[28]
                 spiculation = onenodule[27]
                 malignancy = onenodule[29]

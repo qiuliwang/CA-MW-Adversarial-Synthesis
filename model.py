@@ -67,18 +67,24 @@ class CMGAN(object):
 	# build model
     def build_model(self):
         print('Building the model:')
+
+        # real_A is the input of the framework. In this case, it is a mask.
         self.real_A = self.masks
         print('shape of real_A: ', self.real_A.get_shape().as_list())
 
+        # fake_B is the synthesized fake HU CT image.
         self.fake_B = self.generator(self.real_A, self.y)
+
         print('shape of self.y: ', self.y.get_shape().as_list())
         print('shape of fake_B: ', self.fake_B.get_shape().as_list())
 
+        # Here generates two kinds of image windows: lung window, and mediastinum window.
         self.lung_logits, self.fake_lungwindow = self.decorator_lung_window(self.fake_B, self.lungwindow, self.y)
         self.mediastinum_logits, self.fake_mediastinumwindow = self.decorator_mediastinum_window(self.fake_B, self.mediastinumwindow, self.y)
         self.real_all_masks_images = tf.concat([self.real_A, self.images], 3)
         self.fake_all_masks_images = tf.concat([self.real_A, self.fake_B], 3)
 
+        # descriminator for HU images.
         self.D_all, self.D_all_logits = self.discriminator_all(self.real_all_masks_images, self.y, reuse = False)
         self.D_all_, self.D_all_logits_ = self.discriminator_all(self.fake_all_masks_images, self.y, reuse = True)
 
@@ -86,19 +92,20 @@ class CMGAN(object):
         self.d_all_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = self.D_all_logits_, labels = tf.zeros_like(self.D_all_)))
         
         # get labels for attributes
-        self.y_lobu = tf.slice(self.y, [0,0], [64,5])
+        self.y_text = tf.slice(self.y, [0,0], [64,5])
         self.y_spicu = tf.slice(self.y, [0,5], [64,5])
         self.y_mali = tf.slice(self.y, [0,10], [64,5])
-        print('shape of lobu label ', self.y_lobu.get_shape().as_list())
+        print('shape of lobu label ', self.y_text.get_shape().as_list())
         print('shape of spicu label ', self.y_spicu.get_shape().as_list())
         print('shape of mali label ', self.y_mali.get_shape().as_list())
 
-        # the loss of classify
+        # the loss for classification. With lung window, we classify spiculation signs. With mediastinum window, we classify texture.
+        # You may classify other medical features with malignancy.csv
         self.pre_lung, self.pre_lung_logits = self.classify_lung(self.fake_lungwindow)
         self.d_loss_classify_lung = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.pre_lung, labels=self.y_spicu))
 
         self.pre_mediastinum, self.pre_mediastinum_logits = self.classify_mediastinum(self.fake_mediastinumwindow)
-        self.d_loss_classify_mediastinum = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.pre_mediastinum, labels=self.y_lobu))
+        self.d_loss_classify_mediastinum = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.pre_mediastinum, labels=self.y_text))
 
         # the loss of malignancy prediction
         self.pre_lung_mali, self.pre_lung_logits_mali = self.classify_lung_mali(self.fake_lungwindow)
@@ -159,7 +166,7 @@ class CMGAN(object):
                 sess.run([opti_C],feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
                 
                 if np.mod(step, 50) == 1 and step != 0:
-                    print('Saving...')
+                    print('Saving training results ...')
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.images: realbatch_array, self.lungwindow: real_lungs, self.mediastinumwindow: real_mediastinums, self.masks: realmasks, self.z: batch_z, self.y: real_labels})
                     save_images(sample_images, [8, 8],
                                 './{}/{:04d}_sample.png'.format(self.train_dir, step))
@@ -170,7 +177,7 @@ class CMGAN(object):
                     save_images(realmasks, [8, 8],
                                 './{}/{:04d}_mask.png'.format(self.train_dir, step)) 
                          
-                    print('save eval image')
+                    print('Saving eval results ...')
                     
                     real_labels = sample_label()
                     realmasks = sample_masks()
@@ -184,7 +191,7 @@ class CMGAN(object):
                     save_images(realmasks, [8, 8],
                                 './{}/{:04d}_mask.png'.format(self.eval_dir, step)) 
                     
-                    print('save test image')
+                    print('Saving testing results ...')
                     real_labels = sample_label()
                     realmasks = sample_masks_test()
                     sample_images, lungwindow, mediastinumwindow = sess.run([self.fake_B, self.fake_lungwindow, self.fake_mediastinumwindow], feed_dict={self.masks: realmasks, self.y: real_labels})
