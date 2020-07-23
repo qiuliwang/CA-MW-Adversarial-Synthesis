@@ -14,6 +14,7 @@ import os
 import argparse
 
 # setting GPU id
+# testing
 os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 flags = tf.app.flags
