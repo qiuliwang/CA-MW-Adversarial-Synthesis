@@ -1,3 +1,9 @@
+'''
+Code borrowed from https://github.com/lancekindle/OtsuPyre
+
+Modified by Long Xiaojiang
+'''
+
 from __future__ import division
 import matplotlib.pyplot as plt
 import math
@@ -342,6 +348,8 @@ class _BetweenClassVariance(object):
         mu = self.mus[k2] - self.mus[k1]
         muT = self.muTotal
         return omega * ((mu - muT)**2)
+
+
 import math 
 def normalize(img):
     # 需要特别注意的是无穷大和无穷小 
@@ -353,7 +361,7 @@ def normalize(img):
                 Max = img[i][j]
             if img[i][j] < Min:
                 Min = img[i][j]
-    print(Max, Min)
+    # print(Max, Min)
     for i in range(img.shape[0]):
         for j in range(img.shape[0]):
             if math.isnan(img[i][j]):
@@ -361,21 +369,23 @@ def normalize(img):
     img = (img - Min) / (Max - Min)
     return img * 255.
 
-def _otsu(img, categories_pixel_nums = 1):
+def _otsu(img, i, categories_pixel_nums = 1):
     '''
     ret_num: the number of image return
     img_nums: the number of calculate thresholds
     categories_pixel_nums: the number of pixel categories
     return the images with only categories_pixel_nums types of pixels
     '''
-    return normalize(img.copy())
-    # img = normalize(img.copy())
+    # return normalize(img.copy())
+    img = normalize(img.copy())
     # ot = OtsuFastMultithreshold()
     # ot.load_image(img)
     # kThresholds = ot.calculate_k_thresholds(categories_pixel_nums)
     # #  print(total)
-    # return ot.apply_thresholds_to_image(kThresholds,img)
-    # plt.imsave('C:/Users/RL/Desktop/可解释性的特征学习分类/otsu/' + str(i) + '.jpg',crushed,cmap="gray")
+    # crushed = ot.apply_thresholds_to_image(kThresholds,img)
+
+    plt.imsave('./ori_image/' + i + '.jpg',img,cmap="gray")
+
     # ans.append(crushed)
     # plt.figure()
     # plt.subplot(121)
@@ -388,3 +398,15 @@ def helper(img, upper=118, down = 45,categories=1):
     ot = OtsuFastMultithreshold()
     ot.load_image(img)
     return ot.apply_thresholds_to_image([down, upper], img)
+
+
+import os
+
+files = os.listdir('/Users/wangql/Local/Data/CAMW_Data/huimages/')
+test_files = files
+
+i = 0
+for onefile in test_files:
+    x = np.load(os.path.join('/Users/wangql/Local/Data/CAMW_Data/huimages/', onefile))
+    _otsu(x, onefile[:len(onefile) - 4], 1)
+    i += 1
